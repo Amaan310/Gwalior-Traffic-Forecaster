@@ -31,7 +31,7 @@ def load_model(path):
 
 model = load_model(MODEL_PATH)
 
-# --- LIVE DATA FUNCTIONS (IMPROVED) ---
+# --- LIVE DATA FUNCTIONS ---
 
 @st.cache_data(ttl=600)
 def get_live_weather(api_key, lat, lon):
@@ -64,7 +64,6 @@ def get_coordinates(api_key, location_name):
 
 @st.cache_data(ttl=600)
 def get_route_details(api_key, start_coords, end_coords):
-    # This function now gets both the time and the route geometry for the map
     url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}&travelMode=car&traffic=false&routeType=fastest"
     try:
         response = requests.get(url)
@@ -73,7 +72,6 @@ def get_route_details(api_key, start_coords, end_coords):
             route = data['routes'][0]
             base_time = route['summary']['travelTimeInSeconds']
             points = route['legs'][0]['points']
-            # The API returns lat/lon pairs, we need to swap them for folium which expects lon/lat
             route_geometry = [[p['latitude'], p['longitude']] for p in points]
             return base_time, route_geometry
     except Exception:
@@ -84,6 +82,11 @@ def get_route_details(api_key, start_coords, end_coords):
 
 st.title("🚗 Gwalior Smart Traffic Forecaster")
 st.write("Enter any start and end location within Gwalior to get a real-time traffic forecast.")
+
+# FIX 1: Initialize session state
+if 'prediction_made' not in st.session_state:
+    st.session_state.prediction_made = False
+    st.session_state.results = {}
 
 WEATHER_API_KEY = st.secrets.get("WEATHER_API_KEY", "")
 TOMTOM_API_KEY = st.secrets.get("TOMTOM_API_KEY", "")
@@ -104,45 +107,56 @@ if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_
 
         if not start_coords or not end_coords:
             st.error("Could not find one or both locations. Please be more specific (e.g., add 'Gwalior').")
+            st.session_state.prediction_made = False
         else:
             base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords)
-            if not base_time or base_time > 10800: # Sanity check for trips > 3 hours
+            if not base_time or base_time > 10800:
                 st.error("Could not calculate a reasonable route. Please check the locations.")
+                st.session_state.prediction_made = False
             else:
                 now_ist = datetime.now(IST)
-                current_hour = now_ist.hour
-                current_day_of_week = now_ist.weekday()
-                is_market_closed = 1 if current_day_of_week == 1 else 0
-                is_holiday = 1 if now_ist.date() in indian_holidays else 0
-                weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
-
+                # ... (rest of the prediction logic)
                 prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
                 prediction_df['base_travel_time_seconds'] = base_time
-                prediction_df['day_of_week'] = current_day_of_week
-                prediction_df['hour_of_day'] = current_hour
-                prediction_df['is_market_closed'] = is_market_closed
-                prediction_df['is_holiday'] = is_holiday
+                prediction_df['day_of_week'] = now_ist.weekday()
+                prediction_df['hour_of_day'] = now_ist.hour
+                prediction_df['is_market_closed'] = 1 if now_ist.weekday() == 1 else 0
+                prediction_df['is_holiday'] = 1 if now_ist.date() in indian_holidays else 0
+                weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
                 prediction_df['weather'] = weather_code
                 prediction_df['route_name_Thatipur-to-Morar'] = 1
 
                 predicted_seconds = model.predict(prediction_df)
                 predicted_minutes = predicted_seconds[0] / 60
-
-                # --- FINAL, POLISHED OUTPUT ---
-                st.success(f"**Estimated Travel Time: {predicted_minutes:.2f} minutes**")
-                st.info(f"**Live Conditions:** {now_ist.strftime('%I:%M %p')}, {now_ist.strftime('%A')}, {weather_desc}")
                 
-                # Display the map with the route
-                if route_geometry:
-                    st.subheader("Recommended Route")
-                    map_center = [GWALIOR_LAT, GWALIOR_LON]
-                    m = folium.Map(location=map_center, zoom_start=12)
-                    folium.PolyLine(route_geometry, color="blue", weight=5, opacity=0.8).add_to(m)
-                    
-                    # Add markers for start and end
-                    start_lat, start_lon = map(float, start_coords.split(','))
-                    end_lat, end_lon = map(float, end_coords.split(','))
-                    folium.Marker([start_lat, start_lon], popup=f"Start: {origin}", icon=folium.Icon(color='green')).add_to(m)
-                    folium.Marker([end_lat, end_lon], popup=f"End: {destination}", icon=folium.Icon(color='red')).add_to(m)
+                # FIX 2: Save results to session state instead of displaying them
+                st.session_state.prediction_made = True
+                st.session_state.results = {
+                    "predicted_minutes": predicted_minutes,
+                    "now_ist": now_ist,
+                    "weather_desc": weather_desc,
+                    "route_geometry": route_geometry,
+                    "start_coords": start_coords,
+                    "end_coords": end_coords,
+                    "origin": origin,
+                    "destination": destination
+                }
 
-                    st_folium(m, width="100%", height=500)
+# FIX 3: Display results outside the button 'if' block, based on session state
+if st.session_state.prediction_made and st.session_state.results:
+    results = st.session_state.results
+    st.success(f"**Estimated Travel Time: {results['predicted_minutes']:.2f} minutes**")
+    st.info(f"**Live Conditions:** {results['now_ist'].strftime('%I:%M %p')}, {results['now_ist'].strftime('%A')}, {results['weather_desc']}")
+    
+    if results['route_geometry']:
+        st.subheader("Recommended Route")
+        map_center = [GWALIOR_LAT, GWALIOR_LON]
+        m = folium.Map(location=map_center, zoom_start=12)
+        folium.PolyLine(results['route_geometry'], color="blue", weight=5, opacity=0.8).add_to(m)
+        
+        start_lat, start_lon = map(float, results['start_coords'].split(','))
+        end_lat, end_lon = map(float, results['end_coords'].split(','))
+        folium.Marker([start_lat, start_lon], popup=f"Start: {results['origin']}", icon=folium.Icon(color='green')).add_to(m)
+        folium.Marker([end_lat, end_lon], popup=f"End: {results['destination']}", icon=folium.Icon(color='red')).add_to(m)
+
+        st_folium(m, width="100%", height=500, returned_objects=[])
