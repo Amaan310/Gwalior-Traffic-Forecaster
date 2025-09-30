@@ -7,7 +7,7 @@ import requests
 import pytz
 import folium
 from streamlit_folium import st_folium
-from urllib.parse import quote # New library for URL encoding
+from urllib.parse import quote
 
 st.set_page_config(page_title="Gwalior Traffic Forecaster", page_icon="🚗", layout="wide")
 
@@ -51,10 +51,14 @@ def get_live_weather(api_key, lat, lon):
         return 0, "Clear ☀️ (default)"
 
 @st.cache_data(ttl=3600)
-def get_coordinates(api_key, location_name):
-    # FIX: URL-encode the location name to handle commas and spaces
-    encoded_location = quote(location_name)
-    url = f"https://api.tomtom.com/search/2/geocode/{encoded_location}, Gwalior, India.json?key={api_key}&lat={GWALIOR_LAT}&lon={GWALIOR_LON}"
+def get_coordinates(api_key, location_name, pincode=None):
+    # FIX: Add pincode to the query if provided, for better accuracy
+    search_query = f"{location_name}, Gwalior, India"
+    if pincode and len(pincode) == 6 and pincode.isdigit():
+        search_query = f"{location_name}, {pincode}, Gwalior, India"
+        
+    encoded_location = quote(search_query)
+    url = f"https://api.tomtom.com/search/2/geocode/{encoded_location}.json?key={api_key}&lat={GWALIOR_LAT}&lon={GWALIOR_LON}"
     try:
         response = requests.get(url)
         data = response.json()
@@ -67,14 +71,12 @@ def get_coordinates(api_key, location_name):
 
 @st.cache_data(ttl=600)
 def get_route_details(api_key, start_coords, end_coords, mode='car'):
-    # FIX: Request detailed polyline for a better map route
     url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}&travelMode={mode}&traffic=true&routeType=fastest&routeRepresentation=polyline"
     try:
         response = requests.get(url)
         data = response.json()
         if 'routes' in data and len(data['routes']) > 0:
             route = data['routes'][0]
-            # Use live traffic time for non-car modes, base time for our car model
             travel_time = route['summary']['trafficTravelTimeInSeconds'] if mode != 'car' else route['summary']['travelTimeInSeconds']
             points = route['legs'][0]['points']
             route_geometry = [[p['latitude'], p['longitude']] for p in points]
@@ -94,27 +96,36 @@ TOMTOM_API_KEY = st.secrets.get("TOMTOM_API_KEY", "")
 if not WEATHER_API_KEY or not TOMTOM_API_KEY:
     st.warning("API Keys not configured. Please contact the app owner.")
 
-col1, col2 = st.columns(2)
+# FIX: Add optional pincode fields for better accuracy
+st.subheader("📍 Start Location")
+col1, col2 = st.columns([3, 1])
 with col1:
-    origin = st.text_input("📍 Where are you starting from?", "Kailash Nagar, Alkapuri")
+    origin = st.text_input("Enter a location name", "Alkapuri Tiraha", label_visibility="collapsed")
 with col2:
-    destination = st.text_input("🏁 Where are you going?", "Gwalior Railway Station")
+    origin_pincode = st.text_input("Pincode (Optional)", "", max_chars=6, label_visibility="collapsed")
+
+st.subheader("🏁 End Location")
+col3, col4 = st.columns([3, 1])
+with col3:
+    destination = st.text_input("Enter a location name", "Gwalior Railway Station", key="dest_name", label_visibility="collapsed")
+with col4:
+    destination_pincode = st.text_input("Pincode (Optional)", "", max_chars=6, key="dest_pincode", label_visibility="collapsed")
 
 if st.button("Get Forecasts", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KEY), use_container_width=True):
     with st.spinner("Analyzing routes and live conditions..."):
-        start_coords = get_coordinates(TOMTOM_API_KEY, origin)
-        end_coords = get_coordinates(TOMTOM_API_KEY, destination)
+        start_coords = get_coordinates(TOMTOM_API_KEY, origin, origin_pincode)
+        end_coords = get_coordinates(TOMTOM_API_KEY, destination, destination_pincode)
 
         if not start_coords or not end_coords:
-            st.error("Could not find one or both locations. Please be more specific.")
+            st.error("Could not find one or both locations. Please be more specific or check the pincode.")
         else:
-            # --- FEATURE: MULTI-MODAL PREDICTIONS ---
             st.session_state.results = {}
             
-            # 1. Car Prediction (using our ML Model)
+            # Car Prediction (using our ML Model)
             base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='car')
             if base_time and base_time < 10800:
                 now_ist = datetime.now(IST)
+                # ... (rest of the prediction logic remains the same)
                 prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
                 prediction_df['base_travel_time_seconds'] = base_time
                 prediction_df['day_of_week'] = now_ist.weekday()
@@ -128,16 +139,12 @@ if st.button("Get Forecasts", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KE
                 st.session_state.results['car'] = predicted_seconds[0] / 60
                 st.session_state.results['route_geometry'] = route_geometry
                 st.session_state.results['weather_desc'] = weather_desc
-
-            # 2. 2-Wheeler (Motorcycle) Prediction (using live TomTom API)
+            
+            # Other travel mode predictions
             moto_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='motorcycle')
-            if moto_time:
-                st.session_state.results['motorcycle'] = moto_time / 60
-
-            # 3. Walking Prediction (using live TomTom API)
+            if moto_time: st.session_state.results['motorcycle'] = moto_time / 60
             walk_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='pedestrian')
-            if walk_time:
-                st.session_state.results['pedestrian'] = walk_time / 60
+            if walk_time: st.session_state.results['pedestrian'] = walk_time / 60
 
 # --- Display Results ---
 if 'results' in st.session_state and st.session_state.results:
@@ -145,26 +152,27 @@ if 'results' in st.session_state and st.session_state.results:
     st.subheader("Travel Time Forecasts")
     
     res_col1, res_col2, res_col3 = st.columns(3)
+    # ... (rest of the display logic remains the same)
     with res_col1:
-        if 'car' in results:
-            st.metric(label="🚗 By Car (AI Forecast)", value=f"{results['car']:.0f} min")
+        if 'car' in results: st.metric(label="🚗 By Car (AI Forecast)", value=f"{results['car']:.0f} min")
     with res_col2:
-        if 'motorcycle' in results:
-            st.metric(label="🏍️ By 2-Wheeler (Live API)", value=f"{results['motorcycle']:.0f} min")
+        if 'motorcycle' in results: st.metric(label="🏍️ By 2-Wheeler (Live API)", value=f"{results['motorcycle']:.0f} min")
     with res_col3:
-        if 'pedestrian' in results:
-            st.metric(label="🚶 By Walking (Live API)", value=f"{results['pedestrian']:.0f} min")
-            
+        if 'pedestrian' in results: st.metric(label="🚶 By Walking (Live API)", value=f"{results['pedestrian']:.0f} min")
     st.info(f"**Live Conditions:** {datetime.now(IST).strftime('%I:%M %p, %A')}, {results.get('weather_desc', 'Weather data unavailable')}")
 
     if results.get('route_geometry'):
         st.subheader("Recommended Route Map")
-        m = folium.Map(location=[GWALIOR_LAT, GWALIOR_LON], zoom_start=13)
+        # FIX: Change map style to a more detailed one
+        m = folium.Map(location=[GWALIOR_LAT, GWALIOR_LON], zoom_start=13, tiles='CartoDB positron')
         folium.PolyLine(results['route_geometry'], color="#0078FF", weight=7, opacity=0.8).add_to(m)
         
         start_lat, start_lon = map(float, start_coords.split(','))
         end_lat, end_lon = map(float, end_coords.split(','))
         folium.Marker([start_lat, start_lon], popup=f"Start: {origin}", icon=folium.Icon(color='green', icon='play')).add_to(m)
         folium.Marker([end_lat, end_lon], popup=f"End: {destination}", icon=folium.Icon(color='red', icon='stop')).add_to(m)
-
+        
+        # Auto-zoom the map to fit the route
+        m.fit_bounds([[start_lat, start_lon], [end_lat, end_lon]])
+        
         st_folium(m, width="100%", height=500, returned_objects=[])
