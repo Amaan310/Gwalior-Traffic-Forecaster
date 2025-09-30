@@ -96,7 +96,6 @@ def get_traffic_status(predicted_time, base_time):
 st.title("🚗 Gwalior Smart Traffic Forecaster")
 st.write("Enter a start and end location in Gwalior to get a traffic forecast.")
 
-# Initialize session state for multi-step process
 if 'stage' not in st.session_state:
     st.session_state.stage = 'search'
 
@@ -127,7 +126,7 @@ if st.session_state.stage == 'search':
             st.session_state.destination_options = get_location_options(TOMTOM_API_KEY, destination, destination_pincode)
             if st.session_state.origin_options and st.session_state.destination_options:
                 st.session_state.stage = 'confirm'
-                st.experimental_rerun()
+                st.rerun() # FIX: Changed to st.rerun()
             else:
                 st.error("Could not find one or both locations. Please be more specific.")
 
@@ -145,45 +144,47 @@ if st.session_state.stage == 'confirm':
         st.session_state.start_coords = st.session_state.origin_options[confirmed_origin_address]
         st.session_state.end_coords = st.session_state.destination_options[confirmed_destination_address]
         st.session_state.stage = 'predict'
-        st.experimental_rerun()
+        st.rerun() # FIX: Changed to st.rerun()
         
     if st.button("Start Over", use_container_width=True):
         st.session_state.stage = 'search'
-        st.experimental_rerun()
+        st.rerun() # FIX: Changed to st.rerun()
 
 # --- STAGE 3: PREDICTION & DISPLAY ---
 if st.session_state.stage == 'predict':
-    with st.spinner("Calculating routes and live conditions..."):
-        start_coords = st.session_state.start_coords
-        end_coords = st.session_state.end_coords
+    # (This section is computationally heavy, so it runs only when the stage is 'predict')
+    start_coords = st.session_state.start_coords
+    end_coords = st.session_state.end_coords
+    
+    results = {}
+    base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='car')
+    if base_time and base_time < 10800:
+        now_ist = datetime.now(IST)
+        prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
+        # ... (feature creation)
+        prediction_df['base_travel_time_seconds'] = base_time
+        prediction_df['day_of_week'], prediction_df['hour_of_day'] = now_ist.weekday(), now_ist.hour
+        prediction_df['is_market_closed'] = 1 if now_ist.weekday() == 1 else 0
+        prediction_df['is_holiday'] = 1 if now_ist.date() in indian_holidays else 0
+        weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
+        prediction_df['weather'] = weather_code
+        prediction_df['route_name_Thatipur-to-Morar'] = 1
         
-        results = {}
-        base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='car')
-        if base_time and base_time < 10800:
-            now_ist = datetime.now(IST)
-            prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
-            prediction_df['base_travel_time_seconds'] = base_time
-            prediction_df['day_of_week'], prediction_df['hour_of_day'] = now_ist.weekday(), now_ist.hour
-            prediction_df['is_market_closed'] = 1 if now_ist.weekday() == 1 else 0
-            prediction_df['is_holiday'] = 1 if now_ist.date() in indian_holidays else 0
-            weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
-            prediction_df['weather'] = weather_code
-            prediction_df['route_name_Thatipur-to-Morar'] = 1
-            
-            predicted_seconds = model.predict(prediction_df)
-            results['car'] = predicted_seconds[0] / 60
-            traffic_status_text, traffic_status_emoji = get_traffic_status(predicted_seconds[0], base_time)
-            results['traffic_status'] = f"{traffic_status_text} {traffic_status_emoji}"
-            results['route_geometry'] = route_geometry
-            results['weather_desc'] = weather_desc
+        predicted_seconds = model.predict(prediction_df)
+        results['car'] = predicted_seconds[0] / 60
+        traffic_status_text, traffic_status_emoji = get_traffic_status(predicted_seconds[0], base_time)
+        results['traffic_status'] = f"{traffic_status_text} {traffic_status_emoji}"
+        results['route_geometry'] = route_geometry
+        results['weather_desc'] = weather_desc
 
-        moto_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='motorcycle')
-        if moto_time: results['motorcycle'] = moto_time / 60
-        walk_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='pedestrian')
-        if walk_time: results['pedestrian'] = walk_time / 60
+    moto_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='motorcycle')
+    if moto_time: results['motorcycle'] = moto_time / 60
+    walk_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='pedestrian')
+    if walk_time: results['pedestrian'] = walk_time / 60
 
     st.subheader("Live Forecast")
     res_col1, res_col2, res_col3, res_col4 = st.columns(4)
+    # ... (display results)
     with res_col1: st.metric(label="Traffic Status", value=results.get('traffic_status', 'N/A'))
     with res_col2: st.metric(label="🚗 By Car (AI)", value=f"{results.get('car', 0):.0f} min")
     with res_col3: st.metric(label="🏍️ By 2-Wheeler", value=f"{results.get('motorcycle', 0):.0f} min")
@@ -204,4 +205,4 @@ if st.session_state.stage == 'predict':
 
     if st.button("New Search", use_container_width=True):
         st.session_state.stage = 'search'
-        st.experimental_rerun()
+        st.rerun() # FIX: Changed to st.rerun()
