@@ -32,7 +32,7 @@ def load_model(path):
 
 model = load_model(MODEL_PATH)
 
-# --- LIVE DATA FUNCTIONS (UPGRADED) ---
+# --- LIVE DATA FUNCTIONS ---
 
 @st.cache_data(ttl=600)
 def get_live_weather(api_key, lat, lon):
@@ -52,11 +52,9 @@ def get_live_weather(api_key, lat, lon):
 
 @st.cache_data(ttl=3600)
 def get_coordinates(api_key, location_name, pincode=None):
-    # FIX: Add pincode to the query if provided, for better accuracy
     search_query = f"{location_name}, Gwalior, India"
     if pincode and len(pincode) == 6 and pincode.isdigit():
         search_query = f"{location_name}, {pincode}, Gwalior, India"
-        
     encoded_location = quote(search_query)
     url = f"https://api.tomtom.com/search/2/geocode/{encoded_location}.json?key={api_key}&lat={GWALIOR_LAT}&lon={GWALIOR_LON}"
     try:
@@ -85,6 +83,17 @@ def get_route_details(api_key, start_coords, end_coords, mode='car'):
         return None, None
     return None, None
 
+# FIX: New function to determine traffic status
+def get_traffic_status(predicted_time, base_time):
+    if base_time == 0: return "Unknown", "⚪"
+    ratio = predicted_time / base_time
+    if ratio < 1.2:
+        return "Light Traffic", "🟢"
+    elif 1.2 <= ratio < 1.6:
+        return "Moderate Traffic", "🟡"
+    else:
+        return "Heavy Traffic", "🔴"
+
 # --- STREAMLIT APP INTERFACE ---
 
 st.title("🚗 Gwalior Smart Traffic Forecaster")
@@ -96,20 +105,21 @@ TOMTOM_API_KEY = st.secrets.get("TOMTOM_API_KEY", "")
 if not WEATHER_API_KEY or not TOMTOM_API_KEY:
     st.warning("API Keys not configured. Please contact the app owner.")
 
-# FIX: Add optional pincode fields for better accuracy
 st.subheader("📍 Start Location")
 col1, col2 = st.columns([3, 1])
 with col1:
-    origin = st.text_input("Enter a location name", "Alkapuri Tiraha", label_visibility="collapsed")
+    origin = st.text_input("Enter a location name", "Alkapuri Tiraha")
 with col2:
-    origin_pincode = st.text_input("Pincode (Optional)", "", max_chars=6, label_visibility="collapsed")
+    # FIX: Make pincode label visible
+    origin_pincode = st.text_input("Pincode (Optional)", "", max_chars=6)
 
 st.subheader("🏁 End Location")
 col3, col4 = st.columns([3, 1])
 with col3:
-    destination = st.text_input("Enter a location name", "Gwalior Railway Station", key="dest_name", label_visibility="collapsed")
+    destination = st.text_input("Enter a location name", "Gwalior Railway Station")
 with col4:
-    destination_pincode = st.text_input("Pincode (Optional)", "", max_chars=6, key="dest_pincode", label_visibility="collapsed")
+    # FIX: Make pincode label visible
+    destination_pincode = st.text_input("Pincode (Optional)", "", max_chars=6, key="dest_pincode")
 
 if st.button("Get Forecasts", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KEY), use_container_width=True):
     with st.spinner("Analyzing routes and live conditions..."):
@@ -120,14 +130,13 @@ if st.button("Get Forecasts", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KE
             st.error("Could not find one or both locations. Please be more specific or check the pincode.")
         else:
             st.session_state.results = {}
-            
-            # Car Prediction (using our ML Model)
             base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='car')
+
             if base_time and base_time < 10800:
                 now_ist = datetime.now(IST)
-                # ... (rest of the prediction logic remains the same)
                 prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
                 prediction_df['base_travel_time_seconds'] = base_time
+                # ... (rest of feature creation)
                 prediction_df['day_of_week'] = now_ist.weekday()
                 prediction_df['hour_of_day'] = now_ist.hour
                 prediction_df['is_market_closed'] = 1 if now_ist.weekday() == 1 else 0
@@ -135,12 +144,17 @@ if st.button("Get Forecasts", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KE
                 weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
                 prediction_df['weather'] = weather_code
                 prediction_df['route_name_Thatipur-to-Morar'] = 1
+
                 predicted_seconds = model.predict(prediction_df)
                 st.session_state.results['car'] = predicted_seconds[0] / 60
+                
+                # FIX: Calculate and save traffic status
+                traffic_status_text, traffic_status_emoji = get_traffic_status(predicted_seconds[0], base_time)
+                st.session_state.results['traffic_status'] = f"{traffic_status_text} {traffic_status_emoji}"
+                
                 st.session_state.results['route_geometry'] = route_geometry
                 st.session_state.results['weather_desc'] = weather_desc
             
-            # Other travel mode predictions
             moto_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='motorcycle')
             if moto_time: st.session_state.results['motorcycle'] = moto_time / 60
             walk_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='pedestrian')
@@ -149,30 +163,32 @@ if st.button("Get Forecasts", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KE
 # --- Display Results ---
 if 'results' in st.session_state and st.session_state.results:
     results = st.session_state.results
-    st.subheader("Travel Time Forecasts")
+    st.subheader("Live Forecast")
     
-    res_col1, res_col2, res_col3 = st.columns(3)
-    # ... (rest of the display logic remains the same)
+    res_col1, res_col2, res_col3, res_col4 = st.columns(4)
+    # FIX: Add new metric for Traffic Status
     with res_col1:
-        if 'car' in results: st.metric(label="🚗 By Car (AI Forecast)", value=f"{results['car']:.0f} min")
+        if 'traffic_status' in results: st.metric(label="Traffic Status", value=results['traffic_status'])
     with res_col2:
-        if 'motorcycle' in results: st.metric(label="🏍️ By 2-Wheeler (Live API)", value=f"{results['motorcycle']:.0f} min")
+        if 'car' in results: st.metric(label="🚗 By Car (AI)", value=f"{results['car']:.0f} min")
     with res_col3:
-        if 'pedestrian' in results: st.metric(label="🚶 By Walking (Live API)", value=f"{results['pedestrian']:.0f} min")
+        if 'motorcycle' in results: st.metric(label="🏍️ By 2-Wheeler", value=f"{results['motorcycle']:.0f} min")
+    with res_col4:
+        if 'pedestrian' in results: st.metric(label="🚶 By Walking", value=f"{results['pedestrian']:.0f} min")
+            
     st.info(f"**Live Conditions:** {datetime.now(IST).strftime('%I:%M %p, %A')}, {results.get('weather_desc', 'Weather data unavailable')}")
 
     if results.get('route_geometry'):
-        st.subheader("Recommended Route Map")
-        # FIX: Change map style to a more detailed one
-        m = folium.Map(location=[GWALIOR_LAT, GWALIOR_LON], zoom_start=13, tiles='CartoDB positron')
-        folium.PolyLine(results['route_geometry'], color="#0078FF", weight=7, opacity=0.8).add_to(m)
+        st.subheader("Route Map")
+        # FIX: Use Google Maps tile layer for a better look
+        google_maps_tile = 'http://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+        m = folium.Map(location=[GWALIOR_LAT, GWALIOR_LON], zoom_start=13, tiles=google_maps_tile, attr='Google')
+        folium.PolyLine(results['route_geometry'], color="#0055FF", weight=7, opacity=0.8).add_to(m)
         
         start_lat, start_lon = map(float, start_coords.split(','))
         end_lat, end_lon = map(float, end_coords.split(','))
         folium.Marker([start_lat, start_lon], popup=f"Start: {origin}", icon=folium.Icon(color='green', icon='play')).add_to(m)
         folium.Marker([end_lat, end_lon], popup=f"End: {destination}", icon=folium.Icon(color='red', icon='stop')).add_to(m)
         
-        # Auto-zoom the map to fit the route
         m.fit_bounds([[start_lat, start_lon], [end_lat, end_lon]])
-        
         st_folium(m, width="100%", height=500, returned_objects=[])
