@@ -1,0 +1,219 @@
+alias,official_search_query,category
+
+# Colleges & Universities
+MITS,Madhav Institute of Technology and Science Gwalior,College
+ITM,ITM University Gwalior,College
+ITM Turari,ITM University Campus Turari Gwalior,College
+ITM Sithouli,ITM University Sithouli Campus Gwalior,College
+Amity University,Amity University Gwalior,College
+Shriram College,Shriram College of Engineering and Management Gwalior,College
+LNIPE,Lakshmibai National Institute of Physical Education Gwalior,College
+Jiwaji University,Jiwaji University Gwalior,College
+Prestige Institute,Prestige Institute of Management Gwalior,College
+Gajra Raja Medical College,Gajra Raja Medical College GRMC Lashkar Gwalior,College
+Government Ayurveda College,Government Autonomous Ayurveda College and Hospital Gwalior,College
+
+# Schools & Institutes
+Scindia School,The Scindia School Gwalior,School
+DPS,DPS Gwalior,School
+Scindia Kanya Vidyalaya,Scindia Kanya Vidyalaya Gwalior,School
+Little Angels,Little Angels High School Gwalior,School
+
+# Landmarks & Tourist Attractions
+Gwalior Fort,Gwalior Fort Landmark,Landmark
+Maharaj Bada,Maharaj Bada Gwalior,Landmark
+Jai Vilas Palace,Jai Vilas Palace Museum Gwalior,Landmark
+Sas Bahu Temple,Sas Bahu Temple Gwalior,Landmark
+Teli Ka Mandir,Teli Ka Mandir Gwalior,Landmark
+Tansen Tomb,Tomb of Tansen Gwalior,Landmark
+Gopachal Parvat,Gopachal Parvat Gwalior,Landmark
+Gujari Mahal,Gujari Mahal Archaeological Museum Gwalior,Landmark
+Man Mandir Palace,Man Mandir Palace Gwalior,Landmark
+Gole Ka Mandir,Gole Ka Mandir Gwalior,Temple
+Surya Mandir,Surya Mandir Sun Temple Gwalior,Temple
+Tansen Sangeet Sammelan Venue,Tansen Sangeet Maidan Gwalior,Landmark
+
+# Transit (Rail/Bus/Air/Stations)
+Railway Station,Gwalior Railway Station,Transit
+Gwalior Cantt,Gwalior Cantonment Railway Station,Transit
+Birlanagar Station,Birlanagar Railway Station Gwalior,Transit
+Morar Cantt Station,Morar Cantonment Railway Station Gwalior,Transit
+DD Nagar Station,Deen Dayal Nagar Railway Station Gwalior,Transit
+Bus Stand,Gwalior Bus Stand,Transit
+Gwalior Airport,Gwalior Airport Maharajpura,Transit
+
+# Malls & Markets
+DB Mall,DB City Mall Gwalior,Mall
+Deendayal Mall,Deendayal City Mall Gwalior,Mall
+City Centre,City Center Gwalior,Market
+Hazira Market,Hazira Market Gwalior,Market
+Phool Bagh Market,Phool Bagh Market Gwalior,Market
+Daulat Ganj Market,Daulatganj Market Gwalior,Market
+Gole Bazaar,Gola Bazaar Gwalior,Market
+
+# Hospitals & Medical
+Global Hospital,Global Hospital and Research Centre Gwalior,Hospital
+Birla Hospital,Birla Hospital Gwalior,Hospital
+Maya Hospital,Maya Hospital Gwalior,Hospital
+Cancer Hospital,Cancer Hospital and Research Institute Gwalior,Hospital
+Sahara Hospital,Sahara Hospital Gwalior,Hospital
+Jaya Arogya Hospital,Jaya Arogya Hospital Gwalior,Hospital
+Gajra Raja Superspeciality Hospital,GRMC Superspeciality Hospital Gwalior,Hospital
+Apollo Spectra, Apollo Spectra Hospital Gwalior,Hospital
+Kalyan Memorial,Kalyan Memorial and KDJ Hospital Morar Gwalior,Hospital
+BIMR Hospital,BIMR Hospital Gwalior,Hospital
+
+# Residential Societies / Colonies / Neighborhoods (big list)
+City Centre City Centre Gwalior,Locality
+Lashkar,Lashkar Gwalior,Locality
+Thatipur,Thatipur Gwalior,Locality
+Morar,Morar Gwalior,Locality
+Padav,Padav Gwalior,Locality
+Vinay Nagar,Vinay Nagar Gwalior,Locality
+Govindpuri,Govindpuri Gwalior,Locality
+Gandhi Nagar,Gandhi Nagar Gwalior,Locality
+Deen Dayal Nagar,Deen Dayal Nagar D D Nagar Gwalior,Locality
+D D Nagar,D D Nagar Gwalior,Locality
+Blue Lotus Hills,Blue Lotus Hills Gwalior,Society
+DB City,DB City Gwalior,Locality
+Sikandar Kampoo,Sikandar Kampoo Gwalior,Locality
+Anand Nagar,Anand Nagar Gwalior,Locality
+Badagaon,Badagaon Gwalior,Locality
+Sirol,Sirol Gwalior,Locality
+Aditya Puram,Aditya Puram Gwalior,Locality
+Gulmohar City,Gulmohar City Gwalior,Society
+Moti Jheel,Moti Jheel Gwalior,Locality
+Mahalgaon,Mahalgaon Gwalior,Locality
+Tansen Nagar,Tansen Nagar Gwalior,Locality
+Surya Nagar,Surya Nagar Gwalior,Locality
+Maharajpura,Maharajpura Gwalior,Locality
+Daulat Ganj,Daulat Ganj Gwalior,Locality
+Patel Nagar,Patel Nagar Gwalior,Locality
+Dongarpur,Dongarpur Gwalior,Locality
+Girwai,Girwai Gwalior,Locality
+Sindhi Colony,Sindhi Colony Gwalior,Colony
+Darpan Colony,Darpan Colony Gwalior,Colony
+Model Town,Model Town Gwalior,Locality
+Khureri,Khureri Gwalior,Locality
+Pinto Park,Pinto Park Gwalior,Locality
+Morar Cantonment,Morar Cantt Gwalior,Locality
+Shinde Ki Chhawani,Shinde Ki Chhawani Gwalior,Locality
+Madhav Ganj,Madhav Ganj Gwalior,Locality
+Bakloh Cantonment,Bakloh Cantt Gwalior,Locality
+Gwalior Fort Area,Gwalior Fort Area Gwalior,Locality
+Gandhinagar,Gandhinagar Gwalior,Locality
+Tulsi Vihar,Tulsi Vihar Colony Gwalior,Colony
+Kampoo,Kampoo Kampoo Gwalior,Locality
+Gol Pahariya,Gol Pahariya Gwalior,Locality
+Saraswati Nagar,Saraswati Nagar Gwalior,Locality
+New Balwant Nagar,New Balwant Nagar Gwalior,Locality
+Pandit Deendayal Nagar,Pandit Deendayal Nagar Gwalior,Locality
+Birla Nagar,Birla Nagar Gwalior,Locality
+Gadhaipura,Gadhaipura Gwalior,Locality
+Sheel Nagar,Sheel Nagar Gwalior,Locality
+Chauhan Pyaoo Chauhan Pyaoo Thatipur Gwalior,Locality
+Vidhya Nagar,Vidhya Nagar Mahalgaon Gwalior,Locality
+Nimbalkar Ki Goth,Nimbalkar Ki Goth No 2 Lohiya Bazaar Gwalior,Locality
+Hurawali,Hurawali Gwalior,Locality
+New Payga Gudi,New Payga Gudi Gwalior,Locality
+Dholi Bua Ka Pul,Dholi Bua Ka Pul Gwalior,Locality
+Shri Ram Colony,Shri Ram Colony Gwalior,Colony
+Kheriya Mirdha,Kheriya Mirdha Gwalior,Locality
+Bakshi Ki Goth,Bakshi Ki Goth Gwalior,Locality
+Shekhpura,Shekhpura Gwalior,Locality
+Kunj Vihar,Kunj Vihar Gwalior,Colony
+Bhagat Singh Nagar,Bhagat Singh Nagar Gwalior,Colony
+Laxmi Ganj,Laxmi Ganj Gwalior,Locality
+Azad Nagar,Azad Nagar Morar Gwalior,Locality
+Kala Saiyad,Kala Saiyad Gwalior,Locality
+Ghosipura,Ghosipura Gwalior,Locality
+Lohiya Bazaar,Lohiya Bazaar Gwalior,Market
+D Sector,D Sector Deen Dayal Nagar Gwalior,Locality
+Vijaynagar,Vijaynagar Gwalior,Locality
+Laltipara,Laltipara Gwalior,Locality
+Nagor,Nagor Gwalior,Locality
+Jivaji Ganj,Jivaji Ganj Gwalior,Locality
+Dana Oli,Dana Oli Gwalior,Locality
+Chana Kothar,Chana Kothar Gwalior,Locality
+Ramaua,Ramaua Gwalior,Locality
+Ramji Ka Pura,Ramji Ka Pura Gwalior,Locality
+Gayatri Nagar,Gayatri Nagar Gwalior,Locality
+Kalyanpur,Kalyanpur Gwalior,Locality
+Gurunanak Nagar,Gurunanak Nagar Gwalior,Locality
+Saath Bhai Ki Goth,Saath Bhai Ki Goth Gwalior,Locality
+R J Puram,R J Puram Gwalior,Locality
+Scindiya Nagar,Scindiya Nagar Gwalior,Locality
+Shiv Sadan,Shiv Sadan Gwalior,Locality
+Shekh Ki Bagiya,Shekh Ki Bagiya Gwalior,Locality
+Ekta Nagar,Ekta Nagar Gwalior,Locality
+Habipura,Habipura Gwalior,Locality
+Sewak Nagar,Sewak Nagar Gwalior,Locality
+Deo Bagh,Deo Bagh Gwalior,Locality
+Jiyaji Chowk,Jiyaji Chowk Gwalior,Locality
+Lohamandi,Lohamandi Gwalior,Locality
+Sengar Colony,Sengar Colony Gwalior,Colony
+Bajrang Katra,Bajrang Katra Daulatganj Gwalior,Market
+Sikrodi,Sikrodi Gwalior,Locality
+New Saket Nagar,New Saket Nagar Lashkar Gwalior,Locality
+Piplani,Piplani Gwalior,Locality
+Sadar Bazar,Sadar Bazar Gwalior,Market
+Kamalpura,Kamalpura Gwalior,Locality
+Pan Bazar,Pan Bazar Gwalior,Market
+Shastri Nagar,Shastri Nagar Gwalior,Locality
+Indrapuri,Indrapuri Gwalior,Locality
+Rairu,Rairu Gwalior,Locality
+Vivekanand Nagar,Vivekanand Nagar Gwalior,Society
+Shatabdi Puram,Shatabdi Puram Gwalior,Society
+Padav Colony,Padav Colony Gwalior,Locality
+Gandhi Road,Gandhi Road Gwalior,Road
+Morena Link Road,Morena Link Road Gwalior,Road
+Bank Colony,Bank Colony Road Gwalior,Locality
+Kailash Nagar,Kailash Nagar Gwalior,Locality
+Mahalgaon Colony,Mahalgaon Colony Gwalior,Locality
+Morar Village,Morar Village Gwalior,Locality
+Budgee Colony,Budgee Colony Gwalior,Locality
+Sikanderpura,Sikanderpura Gwalior,Locality
+Jail Road,Jail Road Gwalior,Road
+Old Palasia,Old Palasia Gwalior,Locality
+New Palasia,New Palasia Gwalior,Locality
+Gandhi Colony,Gandhi Colony Gwalior,Locality
+
+# Markets / Bazaars (more)
+Italian Garden,Italian Garden Gwalior,Park
+Kailash Bazar,Kailash Bazar Gwalior,Market
+Shivaji Market,Shivaji Market Gwalior,Market
+Mandir Marg,Mandir Marg Gwalior,Road
+Guruwar, Guruwar Market Gwalior,Market
+
+# Roads & Major Junctions
+Gandhi Road,Gandhi Road Gwalior,Road
+Morena Link Road,Morena Link Road Gwalior,Road
+Bhind Road,Bhind Road Gwalior,Road
+Veer Savarkar Marg,Veer Savarkar Marg Lashkar Gwalior,Road
+Bank Colony Road,Bank Colony Road Gwalior,Road
+
+# Temples & Religious Places (extended)
+Gurudwara,Gurudwara Data Bandi Chhor Gwalior,PlaceOfWorship
+Jama Masjid,Jama Masjid Lashkar Gwalior,PlaceOfWorship
+Church of St Peter,St Peters Church Gwalior,PlaceOfWorship
+Shri Bhagwan Madan Mohan Mandir,Shri Bhagwan Madan Mohan Mandir Gole Ka Mandir Gwalior,Temple
+
+# Hotels & Large Stays
+Taj Usha Kiran,Taj Usha Kiran Palace Gwalior,Hotel
+Clarks Inn,Clarks Inn Gwalior,Hotel
+Hotel Landmark,Hotel Landmark Gwalior,Hotel
+
+# Important Government / Civic
+Collectorate,Gwalior Collectorate Office,Other
+Municipal Corporation,Gwalior Municipal Corporation,Other
+District Court,Gwalior District Court,Other
+Police Lines,Police Lines Gwalior,Other
+BSF Colony,BSF Colony Gwalior,Locality
+
+# Other Points of Interest (parks, stadiums, entertainment)
+Phool Bagh,Phool Bagh Gwalior,Park
+Dr Shyama Prasad Mukherjee Stadium,Dr Shyama Prasad Mukherjee Stadium Gwalior,Stadium
+Indira Gandhi Zoological Park,Indira Gandhi Zoo Gwalior,Park
+Tansen Park,Tansen Park Gwalior,Park
+
+# (end of file)
