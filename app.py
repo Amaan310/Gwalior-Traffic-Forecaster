@@ -4,12 +4,15 @@ import joblib
 from datetime import datetime
 import holidays
 import requests
+import pytz # New library for timezones
 
 st.set_page_config(page_title="Gwalior Traffic Forecaster", page_icon="🚗")
 
+# --- CONFIGURATION & MODEL LOADING ---
 MODEL_PATH = "models/traffic_model.joblib"
 GWALIOR_LAT = 26.2183
 GWALIOR_LON = 78.1828
+IST = pytz.timezone('Asia/Kolkata')
 indian_holidays = holidays.India(state='MP', years=datetime.now().year)
 
 MODEL_COLUMNS = [
@@ -25,6 +28,8 @@ def load_model(path):
     return joblib.load(path)
 
 model = load_model(MODEL_PATH)
+
+# --- LIVE DATA FUNCTIONS (IMPROVED) ---
 
 @st.cache_data(ttl=600)
 def get_live_weather(api_key, lat, lon):
@@ -44,7 +49,8 @@ def get_live_weather(api_key, lat, lon):
 
 @st.cache_data(ttl=3600)
 def get_coordinates(api_key, location_name):
-    url = f"https://api.tomtom.com/search/2/geocode/{location_name}, Gwalior, India.json?key={api_key}"
+    # Improved API call with bias towards Gwalior's location
+    url = f"https://api.tomtom.com/search/2/geocode/{location_name}, Gwalior, India.json?key={api_key}&lat={GWALIOR_LAT}&lon={GWALIOR_LON}"
     try:
         response = requests.get(url)
         data = response.json()
@@ -57,7 +63,8 @@ def get_coordinates(api_key, location_name):
 
 @st.cache_data(ttl=600)
 def get_base_travel_time(api_key, start_coords, end_coords):
-    url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}"
+    # Improved API call to specify 'car' travel mode
+    url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}&travelMode=car&traffic=false"
     try:
         response = requests.get(url)
         data = response.json()
@@ -67,6 +74,8 @@ def get_base_travel_time(api_key, start_coords, end_coords):
         return None
     return None
 
+# --- STREAMLIT APP INTERFACE ---
+
 st.title("🚗 Gwalior Smart Traffic Forecaster")
 st.write("Enter any start and end location within Gwalior to get a real-time traffic forecast.")
 
@@ -74,9 +83,9 @@ WEATHER_API_KEY = st.secrets.get("WEATHER_API_KEY", "")
 TOMTOM_API_KEY = st.secrets.get("TOMTOM_API_KEY", "")
 
 if not WEATHER_API_KEY or not TOMTOM_API_KEY:
-    st.warning("API Keys not found. Please ask the app owner to configure them in the secrets.")
+    st.warning("API Keys not configured. Please contact the app owner.")
 
-origin = st.text_input("📍 Where are you starting from?", "Gwalior Fort")
+origin = st.text_input("📍 Where are you starting from?", "Kailash Nagar")
 destination = st.text_input("🏁 Where are you going?", "Gwalior Railway Station")
 
 if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KEY)):
@@ -85,17 +94,18 @@ if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_
         end_coords = get_coordinates(TOMTOM_API_KEY, destination)
 
         if not start_coords or not end_coords:
-            st.error("Could not find one or both locations. Please be more specific.")
+            st.error("Could not find one or both locations. Please be more specific (e.g., add 'Gwalior').")
         else:
             base_time = get_base_travel_time(TOMTOM_API_KEY, start_coords, end_coords)
-            if not base_time:
-                st.error("Could not calculate a route between these locations.")
+            if not base_time or base_time > 7200: # Sanity check for trips > 2 hours
+                st.error("Could not calculate a reasonable route. Please check the locations.")
             else:
-                now = datetime.now()
-                current_hour = now.hour
-                current_day_of_week = now.weekday()
+                # FIX: Get current time in correct IST timezone
+                now_ist = datetime.now(IST)
+                current_hour = now_ist.hour
+                current_day_of_week = now_ist.weekday()
                 is_market_closed = 1 if current_day_of_week == 1 else 0
-                is_holiday = 1 if now.date() in indian_holidays else 0
+                is_holiday = 1 if now_ist.date() in indian_holidays else 0
                 weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
 
                 prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
@@ -110,6 +120,12 @@ if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_
                 predicted_seconds = model.predict(prediction_df)
                 predicted_minutes = predicted_seconds[0] / 60
 
+                # FIX: Improved, clearer output format
                 st.success(f"**Estimated Travel Time: {predicted_minutes:.2f} minutes**")
-                st.info(f"**Route Details:** Base time is {base_time/60:.2f} min. Live conditions are adding ~{predicted_minutes - (base_time/60):.2f} min.")
-                st.info(f"**Live Conditions:** Time: {now.strftime('%H:%M')}, Day: {now.strftime('%A')}, Weather: {weather_desc}")
+                
+                base_time_minutes = base_time / 60
+                traffic_delay = predicted_minutes - base_time_minutes
+                
+                st.info(f"**Route Details:** A normal trip takes **{base_time_minutes:.2f} minutes**. Your model predicts a traffic delay of **~{traffic_delay:.2f} minutes**.")
+                # FIX: Display time in AM/PM format
+                st.info(f"**Live Conditions:** Time: {now_ist.strftime('%I:%M %p')}, Day: {now_ist.strftime('%A')}, Weather: {weather_desc}")
