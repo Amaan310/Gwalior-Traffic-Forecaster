@@ -6,3 +6,5 @@ joblib
 holidays
 requests
 pytz
+folium
+streamlit-folium
