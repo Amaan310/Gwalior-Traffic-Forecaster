@@ -13,6 +13,7 @@ st.set_page_config(page_title="Gwalior Traffic Forecaster", page_icon="🚗", la
 
 # --- CONFIGURATION & MODEL LOADING ---
 MODEL_PATH = "models/traffic_model.joblib"
+GAZETTEER_PATH = "data/gwalior_locations.csv"
 GWALIOR_LAT = 26.2183
 GWALIOR_LON = 78.1828
 IST = pytz.timezone('Asia/Kolkata')
@@ -28,14 +29,27 @@ MODEL_COLUMNS = [
 
 @st.cache_resource
 def load_model(path):
+    """Loads the trained machine learning model."""
     return joblib.load(path)
 
-model = load_model(MODEL_PATH)
+@st.cache_data
+def load_gazetteer(path):
+    """Loads the Gwalior locations knowledge base."""
+    try:
+        df = pd.read_csv(path)
+        return {row['alias'].upper(): row['official_search_query'] for index, row in df.iterrows()}
+    except FileNotFoundError:
+        st.error(f"Knowledge base file not found at {path}. Please ensure 'gwalior_locations.csv' is in the 'data' folder.")
+        return {}
 
-# --- LIVE DATA FUNCTIONS ---
+model = load_model(MODEL_PATH)
+known_locations = load_gazetteer(GAZETTEER_PATH)
+
+# --- LIVE DATA API FUNCTIONS ---
 
 @st.cache_data(ttl=600)
 def get_live_weather(api_key, lat, lon):
+    """Fetches live weather from OpenWeatherMap."""
     url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}"
     try:
         response = requests.get(url).json()
@@ -51,6 +65,7 @@ def get_live_weather(api_key, lat, lon):
 
 @st.cache_data(ttl=3600)
 def get_location_options(api_key, location_name, pincode=None):
+    """Gets top 3 location matches from TomTom Fuzzy Search API."""
     search_query = f"{location_name}, Gwalior, India"
     if pincode and len(pincode) == 6 and pincode.isdigit():
         search_query = f"{location_name}, {pincode}, Gwalior, India"
@@ -59,11 +74,7 @@ def get_location_options(api_key, location_name, pincode=None):
     try:
         response = requests.get(url).json()
         if response and response['results']:
-            options = {}
-            for result in response['results']:
-                address = result['address']['freeformAddress']
-                coords = f"{result['position']['lat']},{result['position']['lon']}"
-                options[address] = coords
+            options = {res['address']['freeformAddress']: f"{res['position']['lat']},{res['position']['lon']}" for res in response['results']}
             return options
     except Exception:
         return {}
@@ -71,20 +82,23 @@ def get_location_options(api_key, location_name, pincode=None):
 
 @st.cache_data(ttl=600)
 def get_route_details(api_key, start_coords, end_coords, mode='car'):
+    """Gets travel time and route geometry from TomTom Routing API."""
     url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}&travelMode={mode}&traffic=true&routeType=fastest&routeRepresentation=polyline"
     try:
         response = requests.get(url).json()
         if 'routes' in response and len(response['routes']) > 0:
             route = response['routes'][0]
-            travel_time = route['summary']['trafficTravelTimeInSeconds'] if mode != 'car' else route['summary']['travelTimeInSeconds']
+            travel_time = route['summary']['trafficTravelTimeInSeconds']
             points = route['legs'][0]['points']
             route_geometry = [[p['latitude'], p['longitude']] for p in points]
-            return travel_time, route_geometry
+            base_time = route['summary']['travelTimeInSeconds']
+            return travel_time, base_time, route_geometry
     except Exception:
-        return None, None
-    return None, None
+        return None, None, None
+    return None, None, None
 
 def get_traffic_status(predicted_time, base_time):
+    """Calculates a human-readable traffic status."""
     if base_time == 0: return "Unknown", "⚪"
     ratio = predicted_time / base_time
     if ratio < 1.2: return "Light Traffic", "🟢"
@@ -94,7 +108,6 @@ def get_traffic_status(predicted_time, base_time):
 # --- STREAMLIT APP INTERFACE ---
 
 st.title("🚗 Gwalior Smart Traffic Forecaster")
-st.write("Enter a start and end location in Gwalior to get a traffic forecast.")
 
 if 'stage' not in st.session_state:
     st.session_state.stage = 'search'
@@ -102,41 +115,41 @@ if 'stage' not in st.session_state:
 WEATHER_API_KEY = st.secrets.get("WEATHER_API_KEY", "")
 TOMTOM_API_KEY = st.secrets.get("TOMTOM_API_KEY", "")
 
-if not WEATHER_API_KEY or not TOMTOM_API_KEY:
-    st.warning("API Keys not configured.")
-
-# --- STAGE 1: SEARCH ---
 if st.session_state.stage == 'search':
-    st.subheader("1. Enter Your Route")
+    st.write("Enter a start and end location in Gwalior to get a traffic forecast.")
+    st.subheader("📍 Start Location")
     col1, col2 = st.columns([3, 1])
     with col1:
-        origin = st.text_input("📍 Start Location", "ITM University, Turari")
+        origin = st.text_input("Enter a location name", "ITM University")
     with col2:
         origin_pincode = st.text_input("Pincode (Optional)", "474001", max_chars=6)
     
+    st.subheader("🏁 End Location")
     col3, col4 = st.columns([3, 1])
     with col3:
-        destination = st.text_input("🏁 End Location", "Gwalior Railway Station")
+        destination = st.text_input("Enter a location name", "Gwalior Railway Station")
     with col4:
         destination_pincode = st.text_input("Pincode (Optional)", "", max_chars=6)
 
     if st.button("Find Locations", use_container_width=True, disabled=(not TOMTOM_API_KEY)):
         with st.spinner("Searching for locations..."):
-            st.session_state.origin_options = get_location_options(TOMTOM_API_KEY, origin, origin_pincode)
-            st.session_state.destination_options = get_location_options(TOMTOM_API_KEY, destination, destination_pincode)
+            origin_query = known_locations.get(origin.upper(), origin)
+            destination_query = known_locations.get(destination.upper(), destination)
+            
+            st.session_state.origin_options = get_location_options(TOMTOM_API_KEY, origin_query, origin_pincode)
+            st.session_state.destination_options = get_location_options(TOMTOM_API_KEY, destination_query, destination_pincode)
+            st.session_state.user_inputs = {'origin': origin, 'destination': destination}
+
             if st.session_state.origin_options and st.session_state.destination_options:
                 st.session_state.stage = 'confirm'
-                st.rerun() # FIX: Changed to st.rerun()
+                st.rerun()
             else:
                 st.error("Could not find one or both locations. Please be more specific.")
 
-# --- STAGE 2: CONFIRMATION ---
 if st.session_state.stage == 'confirm':
     st.subheader("2. Confirm Your Locations")
-    
     st.write("**Select the correct start location:**")
     confirmed_origin_address = st.radio("Origin Options", list(st.session_state.origin_options.keys()), label_visibility="collapsed")
-    
     st.write("**Select the correct end location:**")
     confirmed_destination_address = st.radio("Destination Options", list(st.session_state.destination_options.keys()), label_visibility="collapsed")
 
@@ -144,47 +157,46 @@ if st.session_state.stage == 'confirm':
         st.session_state.start_coords = st.session_state.origin_options[confirmed_origin_address]
         st.session_state.end_coords = st.session_state.destination_options[confirmed_destination_address]
         st.session_state.stage = 'predict'
-        st.rerun() # FIX: Changed to st.rerun()
+        st.rerun()
         
     if st.button("Start Over", use_container_width=True):
         st.session_state.stage = 'search'
-        st.rerun() # FIX: Changed to st.rerun()
+        if 'results' in st.session_state: del st.session_state['results']
+        st.rerun()
 
-# --- STAGE 3: PREDICTION & DISPLAY ---
 if st.session_state.stage == 'predict':
-    # (This section is computationally heavy, so it runs only when the stage is 'predict')
     start_coords = st.session_state.start_coords
     end_coords = st.session_state.end_coords
     
-    results = {}
-    base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='car')
-    if base_time and base_time < 10800:
-        now_ist = datetime.now(IST)
-        prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
-        # ... (feature creation)
-        prediction_df['base_travel_time_seconds'] = base_time
-        prediction_df['day_of_week'], prediction_df['hour_of_day'] = now_ist.weekday(), now_ist.hour
-        prediction_df['is_market_closed'] = 1 if now_ist.weekday() == 1 else 0
-        prediction_df['is_holiday'] = 1 if now_ist.date() in indian_holidays else 0
-        weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
-        prediction_df['weather'] = weather_code
-        prediction_df['route_name_Thatipur-to-Morar'] = 1
+    with st.spinner("Calculating routes and live conditions..."):
+        results = {}
+        car_traffic_time, base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='car')
+        if base_time and base_time < 10800:
+            now_ist = datetime.now(IST)
+            prediction_df = pd.DataFrame(0, index=[0], columns=MODEL_COLUMNS)
+            prediction_df.loc[0, ['base_travel_time_seconds', 'day_of_week', 'hour_of_day']] = [base_time, now_ist.weekday(), now_ist.hour]
+            prediction_df.loc[0, 'is_market_closed'] = 1 if now_ist.weekday() == 1 else 0
+            prediction_df.loc[0, 'is_holiday'] = 1 if now_ist.date() in indian_holidays else 0
+            weather_code, weather_desc = get_live_weather(WEATHER_API_KEY, GWALIOR_LAT, GWALIOR_LON)
+            prediction_df.loc[0, 'weather'] = weather_code
+            prediction_df.loc[0, 'route_name_Thatipur-to-Morar'] = 1
+            predicted_seconds = model.predict(prediction_df)
+            results['car'] = predicted_seconds[0] / 60
+            traffic_status_text, traffic_status_emoji = get_traffic_status(predicted_seconds[0], base_time)
+            results['traffic_status'] = f"{traffic_status_text} {traffic_status_emoji}"
+            results.update({'route_geometry': route_geometry, 'weather_desc': weather_desc})
         
-        predicted_seconds = model.predict(prediction_df)
-        results['car'] = predicted_seconds[0] / 60
-        traffic_status_text, traffic_status_emoji = get_traffic_status(predicted_seconds[0], base_time)
-        results['traffic_status'] = f"{traffic_status_text} {traffic_status_emoji}"
-        results['route_geometry'] = route_geometry
-        results['weather_desc'] = weather_desc
-
-    moto_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='motorcycle')
-    if moto_time: results['motorcycle'] = moto_time / 60
-    walk_time, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='pedestrian')
-    if walk_time: results['pedestrian'] = walk_time / 60
-
+        moto_time, _, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='motorcycle')
+        if moto_time: results['motorcycle'] = moto_time / 60
+        walk_time, _, _ = get_route_details(TOMTOM_API_KEY, start_coords, end_coords, mode='pedestrian')
+        if walk_time: results['pedestrian'] = walk_time / 60
+        
+        st.session_state.results = results
+        
+    st.subheader("Your Route")
+    st.markdown(f"**From:** `{st.session_state.user_inputs['origin']}`  \n**To:** `{st.session_state.user_inputs['destination']}`")
     st.subheader("Live Forecast")
     res_col1, res_col2, res_col3, res_col4 = st.columns(4)
-    # ... (display results)
     with res_col1: st.metric(label="Traffic Status", value=results.get('traffic_status', 'N/A'))
     with res_col2: st.metric(label="🚗 By Car (AI)", value=f"{results.get('car', 0):.0f} min")
     with res_col3: st.metric(label="🏍️ By 2-Wheeler", value=f"{results.get('motorcycle', 0):.0f} min")
@@ -205,4 +217,4 @@ if st.session_state.stage == 'predict':
 
     if st.button("New Search", use_container_width=True):
         st.session_state.stage = 'search'
-        st.rerun() # FIX: Changed to st.rerun()
+        st.rerun()
