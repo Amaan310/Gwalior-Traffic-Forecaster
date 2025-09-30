@@ -4,9 +4,11 @@ import joblib
 from datetime import datetime
 import holidays
 import requests
-import pytz # New library for timezones
+import pytz
+import folium
+from streamlit_folium import st_folium
 
-st.set_page_config(page_title="Gwalior Traffic Forecaster", page_icon="🚗")
+st.set_page_config(page_title="Gwalior Traffic Forecaster", page_icon="🚗", layout="wide")
 
 # --- CONFIGURATION & MODEL LOADING ---
 MODEL_PATH = "models/traffic_model.joblib"
@@ -49,7 +51,6 @@ def get_live_weather(api_key, lat, lon):
 
 @st.cache_data(ttl=3600)
 def get_coordinates(api_key, location_name):
-    # Improved API call with bias towards Gwalior's location
     url = f"https://api.tomtom.com/search/2/geocode/{location_name}, Gwalior, India.json?key={api_key}&lat={GWALIOR_LAT}&lon={GWALIOR_LON}"
     try:
         response = requests.get(url)
@@ -62,17 +63,22 @@ def get_coordinates(api_key, location_name):
     return None
 
 @st.cache_data(ttl=600)
-def get_base_travel_time(api_key, start_coords, end_coords):
-    # Improved API call to specify 'car' travel mode
-    url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}&travelMode=car&traffic=false"
+def get_route_details(api_key, start_coords, end_coords):
+    # This function now gets both the time and the route geometry for the map
+    url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_coords}:{end_coords}/json?key={api_key}&travelMode=car&traffic=false&routeType=fastest"
     try:
         response = requests.get(url)
         data = response.json()
         if 'routes' in data and len(data['routes']) > 0:
-            return data['routes'][0]['summary']['travelTimeInSeconds']
+            route = data['routes'][0]
+            base_time = route['summary']['travelTimeInSeconds']
+            points = route['legs'][0]['points']
+            # The API returns lat/lon pairs, we need to swap them for folium which expects lon/lat
+            route_geometry = [[p['latitude'], p['longitude']] for p in points]
+            return base_time, route_geometry
     except Exception:
-        return None
-    return None
+        return None, None
+    return None, None
 
 # --- STREAMLIT APP INTERFACE ---
 
@@ -85,10 +91,13 @@ TOMTOM_API_KEY = st.secrets.get("TOMTOM_API_KEY", "")
 if not WEATHER_API_KEY or not TOMTOM_API_KEY:
     st.warning("API Keys not configured. Please contact the app owner.")
 
-origin = st.text_input("📍 Where are you starting from?", "Kailash Nagar")
-destination = st.text_input("🏁 Where are you going?", "Gwalior Railway Station")
+col1, col2 = st.columns(2)
+with col1:
+    origin = st.text_input("📍 Where are you starting from?", "Kailash Nagar")
+with col2:
+    destination = st.text_input("🏁 Where are you going?", "Gwalior Railway Station")
 
-if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KEY)):
+if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_API_KEY), use_container_width=True):
     with st.spinner("Analyzing routes and live conditions..."):
         start_coords = get_coordinates(TOMTOM_API_KEY, origin)
         end_coords = get_coordinates(TOMTOM_API_KEY, destination)
@@ -96,11 +105,10 @@ if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_
         if not start_coords or not end_coords:
             st.error("Could not find one or both locations. Please be more specific (e.g., add 'Gwalior').")
         else:
-            base_time = get_base_travel_time(TOMTOM_API_KEY, start_coords, end_coords)
-            if not base_time or base_time > 7200: # Sanity check for trips > 2 hours
+            base_time, route_geometry = get_route_details(TOMTOM_API_KEY, start_coords, end_coords)
+            if not base_time or base_time > 10800: # Sanity check for trips > 3 hours
                 st.error("Could not calculate a reasonable route. Please check the locations.")
             else:
-                # FIX: Get current time in correct IST timezone
                 now_ist = datetime.now(IST)
                 current_hour = now_ist.hour
                 current_day_of_week = now_ist.weekday()
@@ -120,12 +128,21 @@ if st.button("Predict Travel Time", disabled=(not WEATHER_API_KEY or not TOMTOM_
                 predicted_seconds = model.predict(prediction_df)
                 predicted_minutes = predicted_seconds[0] / 60
 
-                # FIX: Improved, clearer output format
+                # --- FINAL, POLISHED OUTPUT ---
                 st.success(f"**Estimated Travel Time: {predicted_minutes:.2f} minutes**")
+                st.info(f"**Live Conditions:** {now_ist.strftime('%I:%M %p')}, {now_ist.strftime('%A')}, {weather_desc}")
                 
-                base_time_minutes = base_time / 60
-                traffic_delay = predicted_minutes - base_time_minutes
-                
-                st.info(f"**Route Details:** A normal trip takes **{base_time_minutes:.2f} minutes**. Your model predicts a traffic delay of **~{traffic_delay:.2f} minutes**.")
-                # FIX: Display time in AM/PM format
-                st.info(f"**Live Conditions:** Time: {now_ist.strftime('%I:%M %p')}, Day: {now_ist.strftime('%A')}, Weather: {weather_desc}")
+                # Display the map with the route
+                if route_geometry:
+                    st.subheader("Recommended Route")
+                    map_center = [GWALIOR_LAT, GWALIOR_LON]
+                    m = folium.Map(location=map_center, zoom_start=12)
+                    folium.PolyLine(route_geometry, color="blue", weight=5, opacity=0.8).add_to(m)
+                    
+                    # Add markers for start and end
+                    start_lat, start_lon = map(float, start_coords.split(','))
+                    end_lat, end_lon = map(float, end_coords.split(','))
+                    folium.Marker([start_lat, start_lon], popup=f"Start: {origin}", icon=folium.Icon(color='green')).add_to(m)
+                    folium.Marker([end_lat, end_lon], popup=f"End: {destination}", icon=folium.Icon(color='red')).add_to(m)
+
+                    st_folium(m, width="100%", height=500)
