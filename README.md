@@ -1,7 +1,6 @@
 # Gwalior-Traffic-Forecaster 🚗
 
 A **location-based smart traffic prediction system** built using **Streamlit**, designed to estimate **real-time traffic conditions and travel time** between two locations in **Gwalior, Madhya Pradesh**.  
-The application helps users make **better route and travel decisions** by visualizing traffic status and routes interactively on a map.
 
 🔗 **Live App:** https://gwalior-traffic-forecaster.streamlit.app
 
