@@ -71,15 +71,6 @@ This project demonstrates the **real-world application of data, APIs, and intera
 
 ---
 
-## 📁 Repository Structure
-Gwalior-Traffic-Forecaster/
-│
-├── app.py               # Main Streamlit application
-├── requirements.txt     # Project dependencies
-├── README.md            # Project documentation
-
----
-
 ## 🎯 Future Enhancements
 
 - 🔮 ML-based traffic prediction using historical + live data
